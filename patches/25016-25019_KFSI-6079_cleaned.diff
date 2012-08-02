@@ -1,0 +1,259 @@
+Index: work/src/edu/arizona/kfs/sys/batch/DocumentRequeueStep.java
+===================================================================
+--- work/src/edu/arizona/kfs/sys/batch/DocumentRequeueStep.java	(revision 25015)
++++ work/src/edu/arizona/kfs/sys/batch/DocumentRequeueStep.java	(revision 25019)
+@@ -1,74 +0,0 @@
+-/**
+- * 
+- */
+-package edu.arizona.kfs.sys.batch;
+-
+-import java.io.BufferedReader;
+-import java.io.File;
+-import java.io.FileReader;
+-import java.io.IOException;
+-import java.util.ArrayList;
+-import java.util.Date;
+-import java.util.Iterator;
+-import java.util.List;
+-
+-import org.kuali.kfs.gl.GeneralLedgerConstants;
+-import org.kuali.kfs.sys.batch.AbstractStep;
+-import org.kuali.kfs.sys.context.SpringContext;
+-import org.kuali.rice.kew.actionrequest.service.DocumentRequeuerService;
+-import org.kuali.rice.kew.routeheader.DocumentRouteHeaderValue;
+-import org.kuali.rice.kew.routeheader.service.RouteHeaderService;
+-import org.kuali.rice.kns.service.DateTimeService;
+-
+-import edu.arizona.kfs.sys.dataaccess.impl.DocumentRequeueDaoOjb;
+-
+-/**
+- * @author kwk43
+- *
+- */
+-public class DocumentRequeueStep extends AbstractStep {
+-
+-    private String reportDirectoryName;
+-    private String fileName = "RequeuedDocuments";
+-    private DocumentRequeueDaoOjb docReqDao;
+-    private DateTimeService dateTimeService;
+-   
+-    /**
+-     * Sets the dateTimeService attribute value.
+-     * @param dateTimeService The dateTimeService to set.
+-     */
+-    public void setDateTimeService(DateTimeService dateTimeService) {
+-        this.dateTimeService = dateTimeService;
+-    }
+-
+-    /**
+-     * Sets the reportDirectoryName attribute value.
+-     * @param reportDirectoryName The reportDirectoryName to set.
+-     */
+-    public void setReportDirectoryName(String reportDirectoryName) {
+-        this.reportDirectoryName = reportDirectoryName;
+-    }
+-
+-    /**
+-     * Sets the docReqDao attribute value.
+-     * @param docReqDao The docReqDao to set.
+-     */
+-    public void setDocReqDao(DocumentRequeueDaoOjb docReqDao) {
+-        this.docReqDao = docReqDao;
+-    }
+-
+-    /* (non-Javadoc)
+-     * @see org.kuali.kfs.sys.batch.Step#execute(java.lang.String, java.util.Date)
+-     */
+-    public boolean execute(String jobName, Date jobRunDate) throws InterruptedException {
+-        
+-        File f = new File(reportDirectoryName + File.separator + fileName + dateTimeService.toDateTimeStringForFilename(new Date()) + ".txt");
+-        docReqDao.buildListOfStuckDocuments((File) f);
+-
+-        return true;
+-    }
+-
+-    
+-    
+-
+-}
+Index: work/src/edu/arizona/kfs/sys/dataaccess/DocumnetRequeueDao.java
+===================================================================
+--- work/src/edu/arizona/kfs/sys/dataaccess/DocumnetRequeueDao.java	(revision 25015)
++++ work/src/edu/arizona/kfs/sys/dataaccess/DocumnetRequeueDao.java	(revision 25019)
+@@ -1,27 +0,0 @@
+-/*
+- * Copyright 2011 The Kuali Foundation.
+- * 
+- * Licensed under the Educational Community License, Version 1.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- * 
+- * http://www.opensource.org/licenses/ecl1.php
+- * 
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-package edu.arizona.kfs.sys.dataaccess;
+-
+-import java.io.File;
+-import java.util.List;
+-
+-public interface DocumnetRequeueDao {
+-    
+-    public void buildListOfStuckDocuments(File fileName);
+-    
+-    
+-
+-}
+Index: work/src/edu/arizona/kfs/sys/dataaccess/impl/DocumentRequeueDaoOjb.java
+===================================================================
+--- work/src/edu/arizona/kfs/sys/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 25015)
++++ work/src/edu/arizona/kfs/sys/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 25019)
+@@ -1,143 +0,0 @@
+-/*
+- * Copyright 2011 The Kuali Foundation.
+- * 
+- * Licensed under the Educational Community License, Version 1.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- * 
+- * http://www.opensource.org/licenses/ecl1.php
+- * 
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-package edu.arizona.kfs.sys.dataaccess.impl;
+-
+-import java.io.File;
+-import java.io.FileNotFoundException;
+-import java.io.IOException;
+-import java.io.PrintStream;
+-import java.sql.PreparedStatement;
+-import java.sql.ResultSet;
+-import java.sql.SQLException;
+-import java.util.ArrayList;
+-import java.util.List;
+-
+-import org.apache.commons.lang.StringUtils;
+-import org.kuali.kfs.sys.KFSPropertyConstants;
+-import org.kuali.kfs.sys.context.SpringContext;
+-import org.kuali.rice.kew.actionrequest.service.DocumentRequeuerService;
+-import org.kuali.rice.kns.dao.jdbc.PlatformAwareDaoBaseJdbc;
+-import org.springframework.jdbc.CannotGetJdbcConnectionException;
+-
+-import edu.arizona.kfs.sys.dataaccess.DocumnetRequeueDao;
+-
+-public class DocumentRequeueDaoOjb extends PlatformAwareDaoBaseJdbc implements DocumnetRequeueDao {
+-    private static final org.apache.log4j.Logger LOG = org.apache.log4j.Logger.getLogger(DocumentRequeueDaoOjb.class);
+-
+-/* 
+- * select 
+-dh.doc_hdr_id, dh.doc_hdr_stat_cd, dh.crte_dt, dh.stat_mdfn_dt, dh.ttl
+- from kulowner.krew_doc_hdr_t dh  --DocumentRouteHeaderValue
+-  left join kulowner.krew_actn_rqst_t ar  --ActionRequestValue
+-  on dh.doc_hdr_id = ar.doc_hdr_id 
+-  and (ar.stat_cd = 'I' or (ar.stat_cd = 'A' and (ar.actn_rqst_cd != 'F' or ar.actn_rqst_cd != 'A'))) --status
+-where dh.doc_hdr_stat_cd = 'R' --docRouteStatus
+-and ar.doc_hdr_id is null --routeHeaderId
+- * */
+-    
+-    protected String STUCK_DOCUMENTS_SQL = 
+-        "select dh.doc_hdr_id, dt.doc_typ_nm, dh.stat_mdfn_dt, dh.ttl \n" + 
+-        "from krew_doc_hdr_t dh \n" + 
+-        "left join krew_actn_rqst_t ar \n" + 
+-        "on dh.doc_hdr_id = ar.doc_hdr_id \n" +
+-        "and (ar.stat_cd = 'I' or (ar.stat_cd = 'A' and (ar.actn_rqst_cd != 'F' or ar.actn_rqst_cd != 'A'))) \n" + 
+-        "inner join krew_doc_typ_t dt on dh.doc_typ_id = dt.doc_typ_id \n" + 
+-        "where dh.doc_hdr_stat_cd = 'R' \n" + 
+-        "and ar.doc_hdr_id is null \n" +
+-        "order by dh.stat_mdfn_dt";
+-    
+-    public void buildListOfStuckDocuments(File fileName){
+-        List<String> stuckDocIds = new ArrayList<String>();
+-        PreparedStatement stmt = null;
+-        ResultSet rs = null;        
+-        PrintStream outputStream = null;
+-        int outputLines = 0;
+-        StringBuilder sb = new StringBuilder();
+-        DocumentRequeuerService requeuer = SpringContext.getBean(DocumentRequeuerService.class);
+-        String status = "";
+-
+-        try {
+-            stmt = getConnection().prepareStatement(STUCK_DOCUMENTS_SQL);
+-            rs = stmt.executeQuery();
+-            fileName.createNewFile();
+-            outputStream = new PrintStream(fileName);
+-            StringBuffer lineBuffer = new StringBuffer(200);
+-            //Write Header here!!
+-            lineBuffer.setLength(0);
+-            lineBuffer.append(StringUtils.rightPad("Status", 8, ' '));
+-            lineBuffer.append(StringUtils.rightPad("DocNum", 7, ' '));
+-            lineBuffer.append(StringUtils.rightPad("Doc Type", 30, ' '));
+-            lineBuffer.append(StringUtils.rightPad("Last Modified", 25, ' '));
+-            lineBuffer.append(StringUtils.rightPad("Last Action", 60, ' '));
+-            outputStream.println(lineBuffer.toString());
+-            while ( rs.next() ) {
+-                
+-                try {
+-                    Long id = new Long(rs.getString(1));
+-                    status = "Success";
+-                    requeuer.requeueDocument(id);
+-                }
+-                catch (Exception ex) {
+-                    status = "Fail";
+-          
+-                
+-                //Write report here!!
+-                lineBuffer.setLength(0);
+-                lineBuffer.append( StringUtils.rightPad(status, 8, ' ') );
+-                lineBuffer.append( StringUtils.rightPad(rs.getString(1), 7, ' ') );
+-                lineBuffer.append( StringUtils.rightPad(rs.getString(2), 30, ' ') );
+-                lineBuffer.append( StringUtils.rightPad(rs.getString(3), 25, ' ') );
+-                lineBuffer.append( StringUtils.rightPad(rs.getString(4), 60, ' ') );
+-                outputStream.println(lineBuffer.toString());
+-                
+-                continue;
+-            }
+-                
+-            }
+-        }
+-        catch (SQLException ex) {
+-            LOG.error("Unable to create and execute statement to retrieve Stuck Documents", ex);
+-            throw new RuntimeException("Unable to create and execute statement to retrieve stuck Documents", ex);
+-        }
+-        catch (FileNotFoundException ex) {
+-            // TODO Auto-generated catch block
+-            ex.printStackTrace();
+-        }catch (IOException ex) {
+-            LOG.error("Unable to create output file for balance records: " + fileName.getAbsolutePath(),ex);
+-            throw new RuntimeException("Unable to create output file for balance records: " + fileName.getAbsolutePath(),ex);
+-        } finally {
+-            if ( outputStream != null ) {
+-                outputStream.close();
+-            }
+-            try {
+-                if ( rs != null ) {
+-                    rs.close();
+-                }
+-                if ( stmt != null ) {
+-                    stmt.close();
+-                }
+-            } catch ( SQLException ex ) {
+-                LOG.warn( "Unable to close result set or statement upon exit of DocumentRequeueJob", ex );
+-            }
+-        }
+-   }
+- 
+-    
+- 
+-    
+-    
+-
+-}

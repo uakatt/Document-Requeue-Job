@@ -1,0 +1,40 @@
+Index: work/src/edu/arizona/kfs/sys/spring-sys.xml
+===================================================================
+--- work/src/edu/arizona/kfs/sys/spring-sys.xml	(revision 25014)
++++ work/src/edu/arizona/kfs/sys/spring-sys.xml	(revision 25015)
+@@ -50,9 +50,6 @@
+     <value>buildingImportJob</value>
+     <value>roomImportJob</value>
+     <!--  END MOD -->
+-    <!--  **START AZ** KFSI- KITT-  KevinMcO  -->
+-    <value>DocumentRequeueJob</value>
+-    <!--  END MOD -->
+     <value>riceMessageDeliverySetSynchJob</value>
+     <value>riceMessageDeliverySetAsynchJob</value>
+    </list>
+@@ -88,25 +85,7 @@
+ 	<bean id="riceMessageDeliverySettingService"
+ 		class="edu.arizona.kfs.sys.service.impl.RiceMessageDeliverySettingServiceImpl" />
+           
+- <bean id="DocumentRequeueJob" parent="unscheduledJobDescriptor">
+-  <property name="steps">
+-   <list>
+-    <ref bean="documentRequeueStep" />
+-   </list>
+-  </property>
+- </bean> 
+  
+- <bean id="documentRequeueStep" class="edu.arizona.kfs.sys.batch.DocumentRequeueStep"
+-  parent="step">
+-  <property name="reportDirectoryName" value="${reports.directory}/sys" />
+-  <property name="docReqDao" ref="documentRequeueDao" />
+-  <property name="dateTimeService" ref="dateTimeService" />
+- </bean> 
+- 
+- <bean id="documentRequeueDao"
+-  class="edu.arizona.kfs.sys.dataaccess.impl.DocumentRequeueDaoOjb" parent="platformAwareDaoJdbc" />
+-      
+-
+  <bean id="buildingImportJob" parent="unscheduledJobDescriptor">
+   <property name="steps">
+    <list>

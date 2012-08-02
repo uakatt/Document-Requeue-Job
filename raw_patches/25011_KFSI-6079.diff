@@ -1,0 +1,76 @@
+Index: financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml
+===================================================================
+--- financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml	(revision 0)
++++ financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml	(revision 25011)
+@@ -0,0 +1,70 @@
++<?xml version="1.0" encoding="UTF-8"?>
++ <!--
++  Copyright 2007 The Kuali Foundation. Licensed under the Educational
++  Community License, Version 1.0 (the "License"); you may not use this
++  file except in compliance with the License. You may obtain a copy of
++  the License at http://www.opensource.org/licenses/ecl1.php Unless
++  required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++  implied. See the License for the specific language governing
++  permissions and limitations under the License.
++ -->
++<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p" xmlns:jaxws="http://cxf.apache.org/jaxws" xsi:schemaLocation="http://www.springframework.org/schema/beans
++        http://www.springframework.org/schema/beans/spring-beans-2.0.xsd
++        http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd">
++
++ <!--  **START AZ** KFSI- KITT-  KevinMcO  Create new module for the new namespace RQ-->
++
++ <bean id="rqModule" parent="rqModule-parentBean" />
++
++ <bean id="rqModule-parentBean" class="org.kuali.kfs.sys.FinancialSystemModuleConfiguration" abstract="true">
++  <property name="namespaceCode" value="RQ" />
++  <property name="initializeDataDictionary" value="true" />
++  <property name="packagePrefixes">
++   <list>
++    <value>edu.arizona.kfs.rq</value>
++   </list>
++  </property>
++
++  <property name="jobNames">
++   <list>
++    <value>DocumentRequeueJob</value>
++   </list>
++  </property>
++
++  <property name="batchFileDirectories">
++   <list>
++    <value>${reports.directory}/rq</value>
++    <value>${staging.directory}/rq</value>
++   </list>
++  </property>
++ </bean>
++
++ <bean id="rqModuleService" parent="rqModuleService-parentBean"/>
++
++    <bean id="rqModuleService-parentBean" class="org.kuali.kfs.sys.service.impl.KfsModuleServiceImpl" abstract="true">
++     <property name="moduleConfiguration" ref="rqModule" />
++    </bean>
++
++ <bean id="DocumentRequeueJob" parent="unscheduledJobDescriptor">
++  <property name="namespaceCode" value="RQ" />
++  <property name="steps">
++   <list>
++    <ref bean="documentRequeueStep" />
++   </list>
++  </property>
++ </bean>
++
++ <bean id="documentRequeueStep" class="edu.arizona.kfs.rq.batch.DocumentRequeueStep" parent="step">
++  <property name="reportDirectoryName" value="${reports.directory}/rq" />
++  <property name="docReqDao" ref="documentRequeueDao" />
++  <property name="dateTimeService" ref="dateTimeService" />
++ </bean>
++
++ <bean id="documentRequeueDao" class="edu.arizona.kfs.rq.dataaccess.impl.DocumentRequeueDaoOjb" parent="platformAwareDaoJdbc" />
++
++
++
++ <!--  END MOD -->
++</beans>
+\ No newline at end of file

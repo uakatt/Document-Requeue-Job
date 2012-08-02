@@ -1,0 +1,90 @@
+Index: financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/batch/DocumentRequeueStep.java
+===================================================================
+--- financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/batch/DocumentRequeueStep.java	(revision 25274)
++++ financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/batch/DocumentRequeueStep.java	(revision 25275)
+@@ -64,7 +64,7 @@
+     public boolean execute(String jobName, Date jobRunDate) throws InterruptedException {
+         
+         File f = new File(reportDirectoryName + File.separator + fileName + dateTimeService.toDateTimeStringForFilename(new Date()) + ".txt");
+-        docReqDao.buildListOfStuckDocuments((File) f);
++        docReqDao.buildListOfStuckDocuments((File) f); 
+ 
+         return true;
+     }
+Index: financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml
+===================================================================
+--- financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml	(revision 25274)
++++ financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/spring-rq.xml	(revision 25275)
+@@ -19,7 +19,7 @@
+  <bean id="rqModule" parent="rqModule-parentBean" />
+ 
+  <bean id="rqModule-parentBean" class="org.kuali.kfs.sys.FinancialSystemModuleConfiguration" abstract="true">
+-  <property name="namespaceCode" value="RQ" />
++  <property name="namespaceCode" value="KR-RQ" />
+   <property name="initializeDataDictionary" value="true" />
+   <property name="packagePrefixes">
+    <list>
+@@ -64,7 +64,6 @@
+ 
+  <bean id="documentRequeueDao" class="edu.arizona.kfs.rq.dataaccess.impl.DocumentRequeueDaoOjb" parent="platformAwareDaoJdbc" />
+ 
+-
+-
+  <!--  END MOD -->
++
+ </beans>
+\ No newline at end of file
+Index: financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java
+===================================================================
+--- financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 25274)
++++ financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 25275)
+@@ -36,20 +36,30 @@
+     private static final org.apache.log4j.Logger LOG = org.apache.log4j.Logger.getLogger(DocumentRequeueDaoOjb.class);
+ 
+     /*
+-     * select dt.doc_typ_nm, dh.doc_hdr_id, dh.crte_dt, dh.stat_mdfn_dt, dh.ttl from krew_doc_hdr_t dh left join krew_actn_rqst_t ar
+-     * on dh.doc_hdr_id = ar.doc_hdr_id and ar.stat_cd = 'A' inner join krew_doc_typ_t dt on dh.doc_typ_id = dt.doc_typ_id left join
+-     * krim_entity_cache_t ec on dh.initr_prncpl_id = ec.prncpl_id where doc_hdr_stat_cd = 'R' --Status of Enroute and ar.doc_hdr_id
+-     * is null and dt.actv_ind = 1 order by dt.doc_typ_nm, dh.crte_dt asc
++select dt.doc_typ_nm, dh.doc_hdr_id, dh.crte_dt, dh.stat_mdfn_dt, dh.ttl 
++from krew_doc_hdr_t dh 
++left join krew_actn_rqst_t ar
++on dh.doc_hdr_id = ar.doc_hdr_id 
++and ar.stat_cd = 'A' and ar.actn_rqst_cd = 'A'
++inner join krew_doc_typ_t dt 
++on dh.doc_typ_id = dt.doc_typ_id 
++left join krim_entity_cache_t ec 
++on dh.initr_prncpl_id = ec.prncpl_id 
++where doc_hdr_stat_cd = 'R' 
++and ar.doc_hdr_id is null 
++and dt.actv_ind = 1 
++order by dt.doc_typ_nm, dh.crte_dt asc
+      */
+ 
+     protected String STUCK_DOCUMENTS_SQL = 
+         "select dh.doc_hdr_id, dt.doc_typ_nm, dh.stat_mdfn_dt, dh.ttl \n" + 
+-        "from krew_doc_hdr_t dh \n" + "left join krew_actn_rqst_t ar \n" + 
++        "from krew_doc_hdr_t dh \n" + 
++        "left join krew_actn_rqst_t ar \n" + 
+         "on dh.doc_hdr_id = ar.doc_hdr_id \n" + 
+-        "and ar.stat_cd = 'A' \n" + 
++        "and ar.stat_cd = 'A' and ar.actn_rqst_cd = 'A' \n" + 
+         "inner join krew_doc_typ_t dt \n" + 
+         "on dh.doc_typ_id = dt.doc_typ_id \n" + 
+-        "where doc_hdr_stat_cd = 'R' \n" + 
++        "where dh.doc_hdr_stat_cd = 'R' \n" + 
+         "and ar.doc_hdr_id is null \n" + 
+         "and dt.actv_ind = 1";
+ 
+Index: financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/DocumnetRequeueDao.java
+===================================================================
+--- financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/DocumnetRequeueDao.java	(revision 25274)
++++ financial-system/kfs/trunk/work/src/edu/arizona/kfs/rq/dataaccess/DocumnetRequeueDao.java	(revision 25275)
+@@ -22,6 +22,6 @@
+  */
+ public interface DocumnetRequeueDao {
+     
+-    public void buildListOfStuckDocuments(File fileName);
++    public void buildListOfStuckDocuments(File fileName); 
+ 
+ }

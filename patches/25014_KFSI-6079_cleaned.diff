@@ -1,0 +1,134 @@
+Index: work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java
+===================================================================
+--- work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 0)
++++ work/src/edu/arizona/kfs/rq/dataaccess/impl/DocumentRequeueDaoOjb.java	(revision 25014)
+@@ -0,0 +1,129 @@
++/*
++ * Copyright 2012 The Kuali Foundation.
++ * 
++ * Licensed under the Educational Community License, Version 1.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ * 
++ * http://www.opensource.org/licenses/ecl1.php
++ * 
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package edu.arizona.kfs.rq.dataaccess.impl;
++
++import java.io.File;
++import java.io.FileNotFoundException;
++import java.io.IOException;
++import java.io.PrintStream;
++import java.sql.PreparedStatement;
++import java.sql.ResultSet;
++import java.sql.SQLException;
++import java.util.ArrayList;
++import java.util.List;
++
++import org.apache.commons.lang.StringUtils;
++import org.kuali.kfs.sys.context.SpringContext;
++import org.kuali.rice.kew.actionrequest.service.DocumentRequeuerService;
++import org.kuali.rice.kns.dao.jdbc.PlatformAwareDaoBaseJdbc;
++
++import edu.arizona.kfs.rq.dataaccess.DocumnetRequeueDao;
++
++public class DocumentRequeueDaoOjb extends PlatformAwareDaoBaseJdbc implements DocumnetRequeueDao {
++    private static final org.apache.log4j.Logger LOG = org.apache.log4j.Logger.getLogger(DocumentRequeueDaoOjb.class);
++
++    /*
++     * select dt.doc_typ_nm, dh.doc_hdr_id, dh.crte_dt, dh.stat_mdfn_dt, dh.ttl from krew_doc_hdr_t dh left join krew_actn_rqst_t ar
++     * on dh.doc_hdr_id = ar.doc_hdr_id and ar.stat_cd = 'A' inner join krew_doc_typ_t dt on dh.doc_typ_id = dt.doc_typ_id left join
++     * krim_entity_cache_t ec on dh.initr_prncpl_id = ec.prncpl_id where doc_hdr_stat_cd = 'R' --Status of Enroute and ar.doc_hdr_id
++     * is null and dt.actv_ind = 1 order by dt.doc_typ_nm, dh.crte_dt asc
++     */
++
++    protected String STUCK_DOCUMENTS_SQL = 
++        "select dh.doc_hdr_id, dt.doc_typ_nm, dh.stat_mdfn_dt, dh.ttl \n" + 
++        "from krew_doc_hdr_t dh \n" + "left join krew_actn_rqst_t ar \n" + 
++        "on dh.doc_hdr_id = ar.doc_hdr_id \n" + 
++        "and ar.stat_cd = 'A' \n" + 
++        "inner join krew_doc_typ_t dt \n" + 
++        "on dh.doc_typ_id = dt.doc_typ_id \n" + 
++        "where doc_hdr_stat_cd = 'R' \n" + 
++        "and ar.doc_hdr_id is null \n" + 
++        "and dt.actv_ind = 1";
++
++    public void buildListOfStuckDocuments(File fileName) {
++        List<String> stuckDocIds = new ArrayList<String>();
++        PreparedStatement stmt = null;
++        ResultSet rs = null;
++        PrintStream outputStream = null;
++        int outputLines = 0;
++        StringBuilder sb = new StringBuilder();
++        DocumentRequeuerService requeuer = SpringContext.getBean(DocumentRequeuerService.class);
++        String status = "";
++        try {
++            stmt = getConnection().prepareStatement(STUCK_DOCUMENTS_SQL);
++            rs = stmt.executeQuery();
++            fileName.createNewFile();
++            outputStream = new PrintStream(fileName);
++            StringBuffer lineBuffer = new StringBuffer(200);
++            // Write Header here!!
++            lineBuffer.setLength(0);
++            lineBuffer.append(StringUtils.rightPad("Status", 8, ' '));
++            lineBuffer.append(StringUtils.rightPad("DocNum", 7, ' '));
++            lineBuffer.append(StringUtils.rightPad("Doc Type", 30, ' '));
++            lineBuffer.append(StringUtils.rightPad("Last Modified", 25, ' '));
++            lineBuffer.append(StringUtils.rightPad("Last Action", 60, ' '));
++            outputStream.println(lineBuffer.toString());
++            while (rs.next()) {
++                try {
++                    Long id = new Long(rs.getString(1));
++                    status = "Success";
++                    requeuer.requeueDocument(id);
++                }
++                catch (Exception ex) {
++                    status = "Fail";
++                }    
++                   
++                    // Write report here!!
++                    lineBuffer.setLength(0);
++                    lineBuffer.append(StringUtils.rightPad(status, 8, ' '));
++                    lineBuffer.append(StringUtils.rightPad(rs.getString(1), 7, ' '));
++                    lineBuffer.append(StringUtils.rightPad(rs.getString(2), 30, ' '));
++                    lineBuffer.append(StringUtils.rightPad(rs.getString(3), 25, ' '));
++                    lineBuffer.append(StringUtils.rightPad(rs.getString(4), 60, ' '));
++                    outputStream.println(lineBuffer.toString());
++
++            }
++        }
++        catch (SQLException ex) {
++            LOG.error("Unable to create and execute statement to retrieve Stuck Documents", ex);
++            throw new RuntimeException("Unable to create and execute statement to retrieve stuck Documents", ex);
++        }
++        catch (FileNotFoundException ex) {
++            // TODO Auto-generated catch block
++            ex.printStackTrace();
++        }
++        catch (IOException ex) {
++            LOG.error("Unable to create output file for balance records: " + fileName.getAbsolutePath(), ex);
++            throw new RuntimeException("Unable to create output file for balance records: " + fileName.getAbsolutePath(), ex);
++        }
++        finally {
++            if (outputStream != null) {
++                outputStream.close();
++            }
++            try {
++                if (rs != null) {
++                    rs.close();
++                }
++                if (stmt != null) {
++                    stmt.close();
++                }
++            }
++            catch (SQLException ex) {
++                LOG.warn("Unable to close result set or statement upon exit of DocumentRequeueJob", ex);
++            }
++        }
++    }
++}
